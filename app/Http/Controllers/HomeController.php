@@ -3,524 +3,501 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use DB;
-//use Session;
-use App\Http\Requests;
-use App\News;
-use App\Category;
-use App\Video;
-use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Validator;
-use RealRashid\SweetAlert\Facades\Alert;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\View;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-//session_start();
+use App\Models\Menu;
+use App\Models\News;
+use App\Models\Category;
+use App\Models\CategoryVideo;
+use App\Models\Video;
+
+use Artesaos\SEOTools\Facades\SEOMeta;
+use Artesaos\SEOTools\Facades\OpenGraph;
+use Artesaos\SEOTools\Facades\TwitterCard;
+use Artesaos\SEOTools\Facades\JsonLd;
+// OR with multi
+use Artesaos\SEOTools\Facades\JsonLdMulti;
+
+// OR
+use Artesaos\SEOTools\Facades\SEOTools;
+
 class HomeController extends Controller
 {
-    public function index(Request $request) {
-      // Seo
-      $title = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_description = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_keywords = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_title = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $canonical = $request->url();
-      //End Seo
 
-      // Menu
-      $category_nav_mobi = DB::table('tbl_category')->select('id')->orderby('created_at', 'asc')->limit(11)->where('status', 1)->where('status_delete', 1)->get();
-      $type_category_nav_mobi = DB::table('tbl_type_category')->select('category_id')->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'asc')->get();
-      $nav_category_mobi_id = [];
-      foreach($category_nav_mobi as $key => $nav_category) {
-        foreach($type_category_nav_mobi as $key => $nav_type_category) {
-          if($nav_category->id == $nav_type_category->category_id) {
-            array_push($nav_category_mobi_id, $nav_category->id);
-            break;
-          }
-        }
-      }
-      $nav_category_mobi = DB::table('tbl_category')->select('id')->whereNotIn('id', $nav_category_mobi_id)
-      ->where('status', 1)->where('status_delete', 1)->get();
-      $category_nav = DB::table('tbl_category')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->limit(11)->get();
-      $type_category_nav = DB::table('tbl_type_category')->select('type_id', 'category_id')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      $type_nav = DB::table('tbl_type')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->get();
-      //End Menu
-
-      // Time
-      date_default_timezone_set('asia/ho_chi_minh');
-      $timeEng = ['Sun','Mon','Tue','Wed', 'Thu', 'Fri', 'Sat', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      $timeVie = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy','Một', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Mười Một', 'Mười Hai'];
-      $time = time();
-      $time = date('D, d/m/Y H:i',$time);
-      $time = str_replace( $timeEng, $timeVie, $time);
-      // End Time
-
-      // Tin hôm nay
-      $post_today_one = News::select('id', 'code', 'name', 'shortdescription', 'thumbnail',
-      DB::raw('DATE(created_at) as created_date'), 
-      DB::raw('(CASE WHEN LENGTH(name) > 120 THEN CONCAT(substring(name, 1, 120), ".", "..") ELSE name END) AS name'),
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 190 THEN CONCAT(substring(shortdescription, 1, 190), ".", "..") ELSE shortdescription END) AS shortdescription'))
-      ->orderby(DB::raw('DATE(created_at)'), 'desc')->orderby('created_at', 'desc')
-      ->where('status', 1)->where('status_delete', 1)->where('status_accept', 1)
-      ->where('accept', 1)->first();
-      // End tin hôm nay
-
-      // Tin hôm nay slide
-      $post_today_slide = News::select('id', 'name', 'code', 'thumbnail',
-      DB::raw('DATE(created_at) as created_date'),
-      DB::raw('(CASE WHEN LENGTH(`tbl_new`.`name`) > 70 THEN CONCAT(substring(`tbl_new`.`name`, 1, 70), ".", "..") ELSE tbl_new.name END) AS name'))
-      ->where('id', '!=', $post_today_one->id)->where('status', 1)->where('status_delete', 1)
-      ->where('accept', 1)->where('status_accept', 1)->take(5)
-      ->orderby(DB::raw('DATE(created_at)'), 'desc')->orderby('created_at', 'desc')->get();
-      // End tin hôm nay slide
-
-      // Tin nổi bật
-      $post_featured = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->take(12)->get();
-      // End tin nổi bật
-
-      // Tin xem nhiều
-      $post_featured_id = [];
-      foreach($post_featured as $q) {
-        array_push($post_featured_id, $q->id);
-      }
-      $post_viewed_more = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->whereNotIn('id', $post_featured_id)->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->get();
-      // End Tin xem nhiều
-
-      // Sự kiện lịch sử
-      $post_historic_events_by_category_id = DB::table('tbl_new_category')->select('new_id')
-      ->where('category_id', 34)->where('status', 1)->where('status_delete', 1)->get();
-      $post_historic_events_id = [];
-      foreach($post_historic_events_by_category_id as $q) {
-        array_push($post_historic_events_id, $q->new_id);
-      }
-      $post_historic_events = News::select('id', 'name', 'code', 'thumbnail', 'shortdescription',
-      DB::raw('(CASE WHEN LENGTH(name) > 60 THEN CONCAT(substring(name, 1, 60), ".", "..") ELSE name END) AS name'),
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 100 THEN CONCAT(substring(shortdescription, 1, 100), ".", "..") ELSE shortdescription END) AS shortdescription'))
-      ->whereIn('id', $post_historic_events_id)->where('status', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('status_delete', 1)->get();
-      // End sự kiện lịch sử
-
-      //Tin Thời Sự tổng hợp
-      $post_today_slide_id = [];
-      foreach($post_today_slide as $q) {
-        array_push($post_today_slide_id, $q->id);
-      }
-      $post_news_one = Cache::remember('article_random_represent',0 , function ()  use ($post_today_one, $post_today_slide_id) {
-        return News::inRandomOrder()->whereNotIn('id', $post_today_slide_id)->where('id', '!=', $post_today_one->id)
-        ->select('id', 'code', 'name', 'thumbnail', 'shortdescription',
-        DB::raw('(CASE WHEN LENGTH(shortdescription) > 200 THEN CONCAT(substring(shortdescription, 1, 200), ".", "..") ELSE shortdescription END) AS shortdescription'),
-        DB::raw('(CASE WHEN LENGTH(name) > 50 THEN CONCAT(substring(name, 1, 50), ".", "..") ELSE name END) AS name'))
-        ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)->first();
-      });
-      $post_news = Cache::remember('article_random',0 , function ()  use ($post_news_one, $post_today_one, $post_today_slide_id){
-        return News::inRandomOrder()
-        ->select('id', 'code', 'name', 'thumbnail', 'shortdescription',
-        DB::raw('(CASE WHEN LENGTH(shortdescription) > 70 THEN CONCAT(substring(shortdescription, 1, 70), ".", "..") ELSE shortdescription END) AS shortdescription'),
-        DB::raw('(CASE WHEN LENGTH(name) > 55 THEN CONCAT(substring(name, 1, 55), ".", "..") ELSE name END) AS name'))
-        ->whereNotIn('id', $post_today_slide_id)->where('id', '!=', $post_today_one->id)->where('id', '!=', $post_news_one->id)
-        ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-        ->take(3)
-        ->get();
-      });
-      //End Thời Sự tổng hợp
-
-      //Video lời Bác dạy ngày này năm xưa
-      $video = Video::select('name', 'code')->where('status', 1)->where('status_delete', 1)->get();
-      //End Video lời Bác dạy ngày này năm xưa
-      return view('pages.home')
-      ->with('category_nav', $category_nav)
-      ->with('type_category_nav', $type_category_nav)
-      ->with('type_nav', $type_nav)
-      ->with('time', $time)
-      ->with('nav_category_mobi', $nav_category_mobi)
-      ->with('title', $title)
-      ->with('meta_description', $meta_description)
-      ->with('meta_keywords', $meta_keywords)
-      ->with('meta_title', $meta_title)
-      ->with('canonical', $canonical)
-      ->with('post_today_one', $post_today_one)
-      ->with('post_today_slide', $post_today_slide)
-      ->with('post_featured', $post_featured)
-      ->with('post_viewed_more', $post_viewed_more)
-      ->with('post_historic_events', $post_historic_events)
-      ->with('post_news_one', $post_news_one)
-      ->with('post_news', $post_news)
-      ->with('video', $video);
+    private $news;
+    protected $paginate = 5;
+    public function __construct(News $news)
+    {
+        $this->news = $news;
     }
-    public function detail_article($code, Request $request) {
-      // Menu
-      $category_nav_mobi = DB::table('tbl_category')->select('id')->orderby('created_at', 'asc')->limit(11)->where('status', 1)->where('status_delete', 1)->get();
-      $type_category_nav_mobi = DB::table('tbl_type_category')->select('category_id')->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'asc')->get();
-      $nav_category_mobi_id = [];
-      foreach($category_nav_mobi as $key => $nav_category) {
-        foreach($type_category_nav_mobi as $key => $nav_type_category) {
-          if($nav_category->id == $nav_type_category->category_id) {
-            array_push($nav_category_mobi_id, $nav_category->id);
-            break;
-          }
-        }
-      }
-      $nav_category_mobi = DB::table('tbl_category')->select('id')->whereNotIn('id', $nav_category_mobi_id)
-      ->where('status', 1)->where('status_delete', 1)->get();
-      $category_nav = DB::table('tbl_category')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->limit(11)->get();
-      $type_category_nav = DB::table('tbl_type_category')->select('type_id', 'category_id')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      $type_nav = DB::table('tbl_type')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      //End Menu
 
-      // Time
-      date_default_timezone_set('asia/ho_chi_minh');
-      $timeEng = ['Sun','Mon','Tue','Wed', 'Thu', 'Fri', 'Sat', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      $timeVie = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy','Một', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Mười Một', 'Mười Hai'];
-      $time = time();
-      $time = date('D, d/m/Y H:i',$time);
-      $time = str_replace( $timeEng, $timeVie, $time);
-      // End Time
+    public function general(Request $request)
+    {
 
-      // Tin nổi bật
-      $post_featured = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->take(12)->get();
-      // End tin nổi bật
+        //Menu
+        $this->data['menus'] = Menu::where('status', 1)->defaultOrder()->get()->toTree();
 
-      // Tin xem nhiều
-      $post_featured_id = [];
-      foreach($post_featured as $q) {
-        array_push($post_featured_id, $q->id);
-      }
-      $post_viewed_more = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->whereNotIn('id', $post_featured_id)->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->get();
-      // End Tin xem nhiều
+        //Setting
+        $this->data['website_name'] = setting('website-name');
+        $this->data['website_url'] = setting('website-url');
+        $this->data['website_address'] = setting('website-address');
+        $this->data['facebook_app_id'] = setting('facebook-app-id');
+        $this->data['website_phone'] = setting('website-phone');
+        $this->data['website_email'] = setting('website-email');
+        $this->data['website_about'] = setting('website-about');
+        $this->data['logo'] = setting('logo', upload_url('70x70no-thumbnail.png'));
+        $this->data['default_thumbnail'] = setting('default-thumbnail', upload_url('70x70no-thumbnail.png'));
+        $this->data['favicon'] = setting('favicon', upload_url('70x70no-thumbnail.png'));
+        $this->data['home_title'] = setting('home-title');
+        $this->data['home_description'] = setting('home-description');
+        $this->data['home_keyword'] = setting('home-keyword');
 
-      // Sự kiện lịch sử
-      $post_historic_events_by_category_id = DB::table('tbl_new_category')->select('new_id')
-      ->where('category_id', 34)->where('status', 1)->where('status_delete', 1)->get();
-      $post_historic_events_id = [];
-      foreach($post_historic_events_by_category_id as $q) {
-        array_push($post_historic_events_id, $q->new_id);
-      }
-      $post_historic_events = News::select('id', 'name', 'code', 'thumbnail', 'shortdescription',
-      DB::raw('(CASE WHEN LENGTH(name) > 60 THEN CONCAT(substring(name, 1, 60), ".", "..") ELSE name END) AS name'),
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 100 THEN CONCAT(substring(shortdescription, 1, 100), ".", "..") ELSE shortdescription END) AS shortdescription'))
-      ->whereIn('id', $post_historic_events_id)->where('status', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('status_delete', 1)->get();
-      // End sự kiện lịch sử
+        $this->data['search_title'] = setting('search-title');
+        $this->data['search_description'] = setting('search-description');
+        $this->data['search_keyword'] = setting('search-keyword');
 
-      // Article
-      $id = strrev(current(explode('-', strrev($code))));
-      $str = strrev(strstr(strrev($code), '-'));
-      $lenght = strlen($str);
-      $code_final = substr($str, 0, $lenght-1);
-      $article = News::find($id)->select('id', 'name', 'shortdescription', 'content', 'view_count', 'keywords', 'created_by', 'created_at')->where('code', $code_final)->where('status', 1)->where('status_delete', 1)->first();
-      $get_category_with_new_id = DB::table('tbl_new_category')->select('category_id')
-      ->where('new_id', $article->id)->where('status', 1)->where('status_delete', 1)->get();
-      $category_id_article = [];
-      foreach($get_category_with_new_id as $q) {
-        array_push($category_id_article, $q->category_id);
-      }
-      $category_with_new_id = Category::inRandomOrder()->select('code', 'name')->whereIn('id', $category_id_article)->where('status', 1)->where('status_delete', 1)->first();
-      $list_category_by_new_id = DB::table('tbl_new_category')->select('category_id')->where('new_id', $article->id)->where('status', 1)->where('status_delete', 1)->get();
-      $category_id = [];
-      foreach($list_category_by_new_id as $q) {
-        array_push($category_id, $q->category_id);
-      }
-      $get_category_id = DB::table('tbl_new_category')->whereIn('category_id', $category_id)->distinct()->get(['new_id']);   
-      $new_id = [];
-      foreach($get_category_id as $q) {
-        array_push($new_id, $q->new_id);
-      }
-      $related_articles= DB::table('tbl_new')
-      ->select('id', 'name', 'code', 'thumbnail', 'shortdescription', 'created_at',
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 110 THEN CONCAT(substring(shortdescription, 1, 110), ".", "..") ELSE shortdescription END) AS shortdescription'), 
-      DB::raw('(CASE WHEN LENGTH(name) > 80 THEN CONCAT(substring(name, 1, 80), ".", "..") ELSE name END) AS name'))
-      ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->whereIn('id', $new_id)->where('id', '!=', $article->id)->get();   
-      // End Article
+        $this->data['canonical'] = $request->url();
 
-      // Seo
-      $title = $article->name." | Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_description = $article->shortdescription;
-      $meta_keywords = $article->keywords;
-      $meta_title = $article->name." | Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $canonical = $request->url();
-      // End Seo
+        $this->data['social_facebook'] = setting('social-facebook');
+        $this->data['social_youtube'] = setting('social-youtube');
+        $this->data['social_zalo'] = setting('social-zalo');
 
-      //Video lời Bác dạy ngày này năm xưa
-      $video = Video::select('name', 'code')->where('status', 1)->where('status_delete', 1)->get();
-      //End Video lời Bác dạy ngày này năm xưa
-      Event::dispatch('posts.view', $article);
-      return view('pages.article.detail_article')->with('category_nav', $category_nav)->with('type_category_nav', $type_category_nav)
-      ->with('type_nav', $type_nav)->with('time', $time)
-      ->with('article', $article)->with('related_articles', $related_articles)
-      ->with('category_with_new_id', $category_with_new_id)->with('nav_category_mobi', $nav_category_mobi)
-      ->with('title', $title)
-      ->with('meta_description', $meta_description)
-      ->with('meta_keywords', $meta_keywords)
-      ->with('meta_title', $meta_title)
-      ->with('canonical', $canonical)
-      ->with('post_featured', $post_featured)
-      ->with('post_viewed_more', $post_viewed_more)
-      ->with('post_historic_events', $post_historic_events)
-      ->with('video', $video);
+        //Time
+        $timeEng = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $timeVie = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Một', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Mười Một', 'Mười Hai'];
+        $time = time();
+        $time = date('D, d/m/Y H:i', $time);
+        $time = str_replace($timeEng, $timeVie, $time);
+        $this->data['time'] = $time;
+
+        return $this->data;
     }
-    public function detail_category($code, Request $request) {
-      // Menu
-      $category_nav_mobi = DB::table('tbl_category')->select('id')->orderby('created_at', 'asc')->limit(11)->where('status', 1)->where('status_delete', 1)->get();
-      $type_category_nav_mobi = DB::table('tbl_type_category')->select('category_id')->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'asc')->get();
-      $nav_category_mobi_id = [];
-      foreach($category_nav_mobi as $key => $nav_category) {
-        foreach($type_category_nav_mobi as $key => $nav_type_category) {
-          if($nav_category->id == $nav_type_category->category_id) {
-            array_push($nav_category_mobi_id, $nav_category->id);
-            break;
-          }
+
+    public function error(Request $request)
+    {
+        // Seo
+        SEOMeta::setTitle(setting('home-title'));
+        SEOMeta::setKeywords(setting('home-keyword'));
+        SEOMeta::addMeta('news_keywords', $value = setting('home-keyword'), $name = 'name');
+        SEOMeta::setDescription(setting('home-description'));
+        SEOMeta::setCanonical($request->url());
+        SEOMeta::addMeta('author', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('copyright', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('generator', $value = setting('website-name'), $name = 'name');
+        SEOMeta::setRobots('noarchive,index,follow');
+
+        OpenGraph::setTitle(setting('home-title'))
+            ->setDescription(setting('home-description'))
+            ->setUrl($request->url())
+            ->setType('article')
+            ->addImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')), ['height' => 800, 'width' => 354])
+            ->setSiteName(setting('website-name'))
+            ->addProperty('locale', 'vi_VN')
+            ->setArticle([
+                'author' => setting('social-facebook'),
+                'publisher' => setting('social-facebook'),
+                'tag' => setting('home-keyword'),
+                'section' => setting('website-name')
+            ]);
+        SEOMeta::addMeta('fb:app_id', $value = setting('facebook-app-id'), $name = 'name');
+
+        TwitterCard::setType('summary')
+            ->setSite(setting('home-title'))
+            ->setTitle(setting('home-title'))
+            ->setDescription(setting('home-description'))
+            ->setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')), ['height' => 800, 'width' => 354])
+            ->addValue('creator', setting('website-name'))
+            ->setUrl($request->url());
+
+        JsonLdMulti::setType('Organization');
+        JsonLdMulti::setTitle(setting('website-name'));
+        JsonLdMulti::setDescription(setting('home-description'));
+        JsonLdMulti::addValue('logo', setting('logo', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setSite(setting('website-name'));
+        JsonLdMulti::setUrl(route('index'));
+        if (!JsonLdMulti::isEmpty()) {
+            JsonLdMulti::newJsonLd();
+            JsonLdMulti::setType('WebSite');
+            JsonLdMulti::setTitle(setting('home-title'));
+            JsonLdMulti::setDescription(setting('home-description'));
+            JsonLdMulti::setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')));
+            JsonLdMulti::setSite(setting('home-title'));
+            JsonLdMulti::setUrl(route('index'));
         }
-      }
-      $nav_category_mobi = DB::table('tbl_category')->select('id')->whereNotIn('id', $nav_category_mobi_id)
-      ->where('status', 1)->where('status_delete', 1)->get();
-      $category_nav = DB::table('tbl_category')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->limit(11)->get();
-      $type_category_nav = DB::table('tbl_type_category')->select('type_id', 'category_id')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      $type_nav = DB::table('tbl_type')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      //End Menu
 
-      // Time
-      date_default_timezone_set('asia/ho_chi_minh');
-      $timeEng = ['Sun','Mon','Tue','Wed', 'Thu', 'Fri', 'Sat', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      $timeVie = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy','Một', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Mười Một', 'Mười Hai'];
-      $time = time();
-      $time = date('D, d/m/Y H:i',$time);
-      $time = str_replace( $timeEng, $timeVie, $time);
-      // End Time
-      
-      // Tin nổi bật
-      $post_featured = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->take(12)->get();
-      // End tin nổi bật
-
-      // Tin xem nhiều
-      $post_featured_id = [];
-      foreach($post_featured as $q) {
-        array_push($post_featured_id, $q->id);
-      }
-      $post_viewed_more = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->whereNotIn('id', $post_featured_id)->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->get();
-      // End Tin xem nhiều
-
-      // Sự kiện lịch sử
-      $post_historic_events_by_category_id = DB::table('tbl_new_category')->select('new_id')
-      ->where('category_id', 34)->where('status', 1)->where('status_delete', 1)->get();
-      $post_historic_events_id = [];
-      foreach($post_historic_events_by_category_id as $q) {
-        array_push($post_historic_events_id, $q->new_id);
-      }
-      $post_historic_events = News::select('id', 'name', 'code', 'thumbnail', 'shortdescription',
-      DB::raw('(CASE WHEN LENGTH(name) > 60 THEN CONCAT(substring(name, 1, 60), ".", "..") ELSE name END) AS name'),
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 100 THEN CONCAT(substring(shortdescription, 1, 100), ".", "..") ELSE shortdescription END) AS shortdescription'))
-      ->whereIn('id', $post_historic_events_id)->where('status', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('status_delete', 1)->get();
-      // End sự kiện lịch sử
-
-      // Category
-      //Lấy id category bằng code category
-      $get_category_id = DB::table('tbl_category')->select('id', 'code', 'name', 'shortdescription', 'keywords')->where('code', $code)->where('status', 1)->where('status_delete', 1)->first();
-      $get_new_id = DB::table('tbl_new_category')->select('new_id')->where('category_id', $get_category_id->id)->get();
-      $new_id = [];
-      foreach($get_new_id as $q) {
-          array_push($new_id, $q->new_id);
-      }
-      $article_represent_by_category = DB::table('tbl_new')->select('id', 'code', 'name', 'thumbnail', 'shortdescription')->whereIn('id', $new_id)->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'ASC')->first();
-      $article_by_category = DB::table('tbl_new')->select('id', 'code', 'name', 'thumbnail', 'shortdescription', 'created_at',
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 150 THEN CONCAT(substring(shortdescription, 1, 150), ".", "..") ELSE shortdescription END) AS shortdescription'),
-      DB::raw('(CASE WHEN LENGTH(name) > 80 THEN CONCAT(substring(name, 1, 80), ".", "..") ELSE name END) AS name'))
-      ->whereIn('id', $new_id)->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('id', '!=', $article_represent_by_category->id)->paginate(10);
-      // End Category
-
-      // Seo
-      $title = $get_category_id->name." | Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_description = $get_category_id->shortdescription;
-      $meta_keywords = $get_category_id->keywords;
-      $meta_title = $get_category_id->name." | Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $canonical = $request->url();
-      // End Seo
-
-      //Video lời Bác dạy ngày này năm xưa
-      $video = Video::select('name', 'code')->where('status', 1)->where('status_delete', 1)->get();
-      //End Video lời Bác dạy ngày này năm xưa
-      return view('pages.category.detail_category')->with('category_nav', $category_nav)->with('type_category_nav', $type_category_nav)
-      ->with('type_nav', $type_nav)->with('time', $time)
-      ->with('get_category_id', $get_category_id)
-      ->with('article_represent_by_category', $article_represent_by_category)->with('article_by_category', $article_by_category)
-      ->with('nav_category_mobi', $nav_category_mobi)
-      ->with('title', $title)
-      ->with('meta_description', $meta_description)
-      ->with('meta_keywords', $meta_keywords)
-      ->with('meta_title', $meta_title)
-      ->with('canonical', $canonical)
-      ->with('post_featured', $post_featured)
-      ->with('post_viewed_more', $post_viewed_more)
-      ->with('post_historic_events', $post_historic_events)
-      ->with('video', $video);
+        return view("errors.404", $this->general($request));
     }
-    public function detail_type($code_category, $code_type, Request $request) {
-      // Menu
-      $category_nav_mobi = DB::table('tbl_category')->select('id')->orderby('created_at', 'asc')->limit(11)->where('status', 1)->where('status_delete', 1)->get();
-      $type_category_nav_mobi = DB::table('tbl_type_category')->select('category_id')->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'asc')->get();
-      $nav_category_mobi_id = [];
-      foreach($category_nav_mobi as $key => $nav_category) {
-        foreach($type_category_nav_mobi as $key => $nav_type_category) {
-          if($nav_category->id == $nav_type_category->category_id) {
-            array_push($nav_category_mobi_id, $nav_category->id);
-            break;
-          }
+
+    public function newsToday()
+    {
+        $news = $this->news;
+        $news_today = Cache::remember('news_today_random', 0, function () use ($news) {
+            return $news::inRandomOrder()->where('status', 1)->whereDate('created_at', today())->first();
+        });
+        if ($news_today == null) {
+
+            $news_yesterday = Cache::remember('news_today_random', 0, function () use ($news) {
+                return $news::inRandomOrder()->where('status', 1)->whereDate('created_at', date('Y-m-d', strtotime("-1 days")))->first();
+            });
+            $news_today = $news_yesterday;
+
+            if ($news_yesterday == null) {
+                $news_latest = Cache::remember('news_today_random', 0, function () use ($news) {
+                    return $news::inRandomOrder()->where('status', 1)->latest('created_at')->first();
+                });
+                $news_today = $news_latest;
+            }
         }
-      }
-      $nav_category_mobi = DB::table('tbl_category')->select('id')->whereNotIn('id', $nav_category_mobi_id)
-      ->where('status', 1)->where('status_delete', 1)->get();
-      $category_nav = DB::table('tbl_category')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->limit(11)->get();
-      $type_category_nav = DB::table('tbl_type_category')->select('type_id', 'category_id')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      $type_nav = DB::table('tbl_type')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      //End Menu
 
-      // Time
-      date_default_timezone_set('asia/ho_chi_minh');
-      $timeEng = ['Sun','Mon','Tue','Wed', 'Thu', 'Fri', 'Sat', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      $timeVie = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy','Một', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Mười Một', 'Mười Hai'];
-      $time = time();
-      $time = date('D, d/m/Y H:i',$time);
-      $time = str_replace( $timeEng, $timeVie, $time);
-      // End Time
-
-      // Tin nổi bật
-      $post_featured = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->orderby('view_count', 'DESC')->take(12)->get();
-      // End tin nổi bật
-
-      // Tin xem nhiều
-      $post_featured_id = [];
-      foreach($post_featured as $q) {
-        array_push($post_featured_id, $q->id);
-      }
-      $post_viewed_more = News::select('id', 'name', 'code',
-      DB::raw('(CASE WHEN LENGTH(name) > 100 THEN CONCAT(substring(name, 1, 100), ".", "..") ELSE name END) AS name'))
-      ->whereNotIn('id', $post_featured_id)->where('status', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('status_delete', 1)->orderby('view_count', 'DESC')->get();
-      // End Tin xem nhiều
-
-      // Sự kiện lịch sử
-      $post_historic_events_by_category_id = DB::table('tbl_new_category')->select('new_id')
-      ->where('category_id', 34)->where('status', 1)->where('status_delete', 1)->get();
-      $post_historic_events_id = [];
-      foreach($post_historic_events_by_category_id as $q) {
-        array_push($post_historic_events_id, $q->new_id);
-      }
-      $post_historic_events = News::select('id', 'name', 'code', 'thumbnail', 'shortdescription',
-      DB::raw('(CASE WHEN LENGTH(name) > 60 THEN CONCAT(substring(name, 1, 60), ".", "..") ELSE name END) AS name'),
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 100 THEN CONCAT(substring(shortdescription, 1, 100), ".", "..") ELSE shortdescription END) AS shortdescription'))
-      ->whereIn('id', $post_historic_events_id)->where('status', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('status_delete', 1)->get();
-      // End sự kiện lịch sử
-
-      // Type
-      $get_category_id = DB::table('tbl_category')->select('id', 'code', 'name')->where('code', $code_category)->where('status', 1)->where('status_delete', 1)->first();
-      $get_type_id = DB::table('tbl_type')->select('id', 'code', 'name', 'shortdescription', 'keywords')->where('code', $code_type)->where('status', 1)->where('status_delete', 1)->first();
-      $type_by_category_id = DB::table('tbl_type_category')->select('type_id')->where('category_id',$get_category_id->id)->where('type_id',$get_type_id->id)->where('status', 1)->where('status_delete', 1)->first();
-      $get_new_id = DB::table('tbl_new_category')->select('new_id')->where('type_id', $type_by_category_id->type_id)->where('status', 1)->where('status_delete', 1)->get();
-      $new_id = [];
-      foreach($get_new_id as $q) {
-        array_push($new_id, $q->new_id);
-      }
-      $article_by_type_belong_to_category_represent = DB::table('tbl_new')->select('id', 'name', 'code', 'thumbnail', 'shortdescription')
-      ->whereIn('id', $new_id)->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'DESC')->first();
-      $article_by_type_belong_to_category = DB::table('tbl_new')->select('id', 'name', 'code', 'thumbnail', 'shortdescription', 'created_at', 
-      DB::raw('(CASE WHEN LENGTH(shortdescription) > 150 THEN CONCAT(substring(shortdescription, 1, 150), ".", "..") ELSE shortdescription END) AS shortdescription'),
-      DB::raw('(CASE WHEN LENGTH(name) > 80 THEN CONCAT(substring(name, 1, 80), ".", "..") ELSE name END) AS name'))
-      ->whereIn('id', $new_id)->where('status', 1)->where('status_delete', 1)->where('accept', 1)->where('status_accept', 1)
-      ->where('id', '!=', $article_by_type_belong_to_category_represent->id)->paginate(10);
-      // End Type
-      
-      // Seo
-      $title = $get_category_id->name." - ". $get_type_id->name." | Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_description = $get_type_id->shortdescription;
-      $meta_keywords = $get_type_id->keywords;
-      $meta_title = $get_category_id->name." - ". $get_type_id->name." | Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $canonical = $request->url();
-      // End Seo
-
-      //Video lời Bác dạy ngày này năm xưa
-      $video = Video::select('name', 'code')->where('status', 1)->where('status_delete', 1)->get();
-      //End Video lời Bác dạy ngày này năm xưa
-      return view('pages.type.detail_type')->with('category_nav', $category_nav)->with('type_category_nav', $type_category_nav)
-      ->with('type_nav', $type_nav)->with('time', $time)
-      ->with('get_type_id', $get_type_id)->with('get_category_id', $get_category_id)
-      ->with('article_by_type_belong_to_category_represent', $article_by_type_belong_to_category_represent)
-      ->with('article_by_type_belong_to_category', $article_by_type_belong_to_category)->with('nav_category_mobi', $nav_category_mobi)
-      ->with('title', $title)
-      ->with('meta_description', $meta_description)
-      ->with('meta_keywords', $meta_keywords)
-      ->with('meta_title', $meta_title)
-      ->with('canonical', $canonical)
-      ->with('post_featured', $post_featured)
-      ->with('post_viewed_more', $post_viewed_more)
-      ->with('post_historic_events', $post_historic_events)
-      ->with('video', $video);
-
+        return $news_today;
     }
-    public function errors_404(Request $request) {
-      $title = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_description = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_keywords = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $meta_title = "Lực Lượng Vũ Trang Tỉnh Bà Rịa - Vũng Tàu";
-      $canonical = $request->url();
 
-      // Menu
-      $category_nav_mobi = DB::table('tbl_category')->select('id')->orderby('created_at', 'asc')->limit(11)->where('status', 1)->where('status_delete', 1)->get();
-      $type_category_nav_mobi = DB::table('tbl_type_category')->select('category_id')->where('status', 1)->where('status_delete', 1)->orderby('created_at', 'asc')->get();
-      $nav_category_mobi_id = [];
-      foreach($category_nav_mobi as $key => $nav_category) {
-        foreach($type_category_nav_mobi as $key => $nav_type_category) {
-          if($nav_category->id == $nav_type_category->category_id) {
-            array_push($nav_category_mobi_id, $nav_category->id);
-            break;
-          }
+
+    public function index(Request $request)
+    {
+        // Tin nổi bật
+        $this->data['news_hot'] = News::where('hot', 1)->where('status', 1)->take(11)->get();
+
+        // Tin xem nhiều
+        $this->data['news_view_more'] = News::orderByUniqueViews()->where('status', 1)->take(11)->get();
+
+        // Danh mục video sắp sếp đầu tiên
+        $category_video_top = CategoryVideo::where('status', 1)->defaultOrder()->first();
+        $this->data['category_video_top'] = $category_video_top;
+
+        // Video sắp xếp đầu tiên
+        $videos = $category_video_top->videos()->get()->where('status', 1);
+        $this->data['videos'] = $videos;
+
+        // Tin sự kiện lịch sử
+        $this->data['news_event_history'] = News::where('event', 1)->where('status', 1)->take(2)->get();
+
+        // Danh mục sắp xếp đầu tiên
+        $category_general = Category::where('status', 1)->defaultOrder()->first();
+        $this->data['category_general'] = $category_general;
+
+
+        // Danh mục con của danh mục sắp xếp đầu tiên
+        // $subcategory_general =  $category_general->descendants;
+        // $this->data['subcategory_general'] = $subcategory_general;
+
+        $news_today = $this->newsToday();
+
+        // Tin sắp xếp đầu tiên đại diện
+        $news_general_first = $category_general->news()->get()
+            ->where('id', '!=', $news_today->id)
+            ->where('status', 1)->first();
+        $this->data['news_general_first'] = $news_general_first;
+
+        // Tin sắp xếp đầu tiên
+        $news_general = $category_general->news()->get()
+            ->where('id', '!=', $news_today->id)
+            ->where('id', '!=', $news_general_first->id)
+            ->where('status', 1)->take(2);
+        $this->data['news_general'] = $news_general;
+
+        $news_general_slider = $category_general->news()->get()
+            ->where('id', '!=', $news_today->id)
+            ->where('id', '!=', $news_general_first->id)
+            ->whereNotIn('id', $news_general->pluck('id')->toArray())
+            ->where('status', 1);
+
+        $this->data['news_general_slider'] = $news_general_slider;
+
+        // Tin hôm nay
+        $this->data['news_today'] = $news_today;
+
+        // Seo
+        SEOMeta::setTitle(setting('home-title'));
+        SEOMeta::setKeywords(setting('home-keyword'));
+        SEOMeta::addMeta('news_keywords', $value = setting('home-keyword'), $name = 'name');
+        SEOMeta::setDescription(setting('home-description'));
+        SEOMeta::setCanonical($request->url());
+        SEOMeta::addMeta('author', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('copyright', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('generator', $value = setting('website-name'), $name = 'name');
+        SEOMeta::setRobots('noarchive,index,follow');
+
+        OpenGraph::setTitle(setting('home-title'))
+            ->setDescription(setting('home-description'))
+            ->setUrl($request->url())
+            ->setType('article')
+            ->addImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')), ['height' => 800, 'width' => 354])
+            ->setSiteName(setting('website-name'))
+            ->addProperty('locale', 'vi_VN')
+            ->setArticle([
+                'author' => setting('social-facebook'),
+                'publisher' => setting('social-facebook'),
+                'tag' => setting('home-keyword'),
+                'section' => setting('website-name')
+            ]);
+        SEOMeta::addMeta('fb:app_id', $value = setting('facebook-app-id'), $name = 'name');
+
+        TwitterCard::setType('summary')
+            ->setSite(setting('home-title'))
+            ->setTitle(setting('home-title'))
+            ->setDescription(setting('home-description'))
+            ->setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')), ['height' => 800, 'width' => 354])
+            ->addValue('creator', setting('website-name'))
+            ->setUrl($request->url());
+
+        JsonLdMulti::setType('Organization');
+        JsonLdMulti::setTitle(setting('website-name'));
+        JsonLdMulti::setDescription(setting('home-description'));
+        JsonLdMulti::addValue('logo', setting('logo', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setSite(setting('website-name'));
+        JsonLdMulti::setUrl(route('index'));
+        if (!JsonLdMulti::isEmpty()) {
+            JsonLdMulti::newJsonLd();
+            JsonLdMulti::setType('WebSite');
+            JsonLdMulti::setTitle(setting('home-title'));
+            JsonLdMulti::setDescription(setting('home-description'));
+            JsonLdMulti::setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')));
+            JsonLdMulti::setSite(setting('home-title'));
+            JsonLdMulti::setUrl(route('index'));
         }
-      }
-      $nav_category_mobi = DB::table('tbl_category')->select('id')->whereNotIn('id', $nav_category_mobi_id)
-      ->where('status', 1)->where('status_delete', 1)->get();
-      $category_nav = DB::table('tbl_category')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->limit(11)->get();
-      $type_category_nav = DB::table('tbl_type_category')->select('type_id', 'category_id')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      $type_nav = DB::table('tbl_type')->select('id', 'name', 'code')->where('status', 1)->where('status_delete', 1)->orderby('position_number', 'asc')->get();
-      //End Menu
 
-      // Time
-      date_default_timezone_set('asia/ho_chi_minh');
-      $timeEng = ['Sun','Mon','Tue','Wed', 'Thu', 'Fri', 'Sat', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      $timeVie = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy','Một', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Mười Một', 'Mười Hai'];
-      $time = time();
-      $time = date('D, d/m/Y H:i',$time);
-      $time = str_replace( $timeEng, $timeVie, $time);
-      // End Time
-      return view('errors.404')->with('category_nav', $category_nav)->with('type_category_nav', $type_category_nav)->with('type_nav', $type_nav)
-      ->with('time', $time)->with('nav_category_mobi', $nav_category_mobi)
-      ->with('title', $title)
-      ->with('meta_description', $meta_description)
-      ->with('meta_keywords', $meta_keywords)
-      ->with('meta_title', $meta_title)
-      ->with('canonical', $canonical);
+        return view('pages.index', $this->general($request));
+    }
+
+    public function news($slug, $id, Request $request)
+    {
+        $news = News::where('id', $id)->where('slug', $slug)->where('status', 1)->firstorfail();
+        $expiresAt = now()->addHours(3);
+        views($news)->cooldown($expiresAt)->record();
+
+        $this->data['news'] = $news;
+
+        $category =  $news->categories()->inRandomOrder()->get()->where('status', 1)->first();
+        $this->data['category'] = $category;
+
+        $categories = Category::where('status', 1)->ancestorsAndSelf($category->id);
+        $this->data['categories'] = $categories;
+
+        // Tin xem nhiều nhất
+        $news_view_more_first = News::orderby('view', 'DESC')
+            ->where('status', 1)
+            ->where('id', '!=', $id)
+            ->first();
+        $this->data['news_view_more_first'] = $news_view_more_first;
+
+        // Tin xem nhiều
+        $news_view_more = News::orderby('view', 'DESC')
+            ->where('status', 1)
+            ->where('id', '!=', $id)
+            ->where('id', '!=', $news_view_more_first->id)
+            ->take(5)->get();
+        $this->data['news_view_more'] = $news_view_more;
+
+        // Tin liên quan
+        $news_related = $category->news()->get()
+            ->where('status', 1)
+            ->where('id', '!=', $id)
+            ->where('id', '!=', $news_view_more_first->id)
+            ->whereNotIn('id', $news_view_more->pluck('id')->toArray())
+            ->take(2);
+        $this->data['news_related'] = $news_related;
+
+        // Tin liên quan khác
+        $news_related_other = $category->news()->get()
+            ->where('status', 1)
+            ->where('id', '!=', $id)
+            ->where('id', '!=', $news_view_more_first->id)
+            ->whereNotIn('id', $news_view_more->pluck('id')->toArray())
+            ->whereNotIn('id', $news_related->pluck('id')->toArray())
+            ->take(6);
+        $this->data['news_related_other'] = $news_related_other;
+
+        // Seo
+        SEOMeta::setTitle($news->meta_title);
+        SEOMeta::setKeywords($news->meta_keyword);
+        SEOMeta::addMeta('news_keywords', $value = $news->meta_keyword, $name = 'name');
+        SEOMeta::setDescription($news->meta_description);
+        SEOMeta::setCanonical($request->url());
+        SEOMeta::addMeta('author', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('copyright', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('generator', $value = setting('website-name'), $name = 'name');
+        SEOMeta::setRobots('noarchive,index,follow');
+
+        OpenGraph::setTitle($news->meta_title)
+            ->setDescription($news->meta_description)
+            ->setUrl($request->url())
+            ->setType('article')
+            ->addImage($news->thumbnail, ['height' => 800, 'width' => 354])
+            ->setSiteName(setting('website-name'))
+            ->addProperty('locale', 'vi_VN')
+            ->setArticle([
+                'author' => setting('social-facebook'),
+                'publisher' => setting('social-facebook'),
+                'tag' => $news->meta_keyword,
+                'section' => $category->name,
+                'published_time' => $category->created_at,
+                'modified_time' => $category->updated_at
+            ]);
+        SEOMeta::addMeta('fb:app_id', $value = setting('facebook-app-id'), $name = 'name');
+
+        TwitterCard::setType('summary')
+            ->setSite($news->meta_title)
+            ->setTitle($news->meta_title)
+            ->setDescription($news->meta_description)
+            ->setImage($news->thumbnail)
+            ->addValue('creator', setting('website-name'))
+            ->setUrl($request->url());
+
+        JsonLdMulti::setType('Organization');
+        JsonLdMulti::setTitle(setting('website-name'));
+        JsonLdMulti::setDescription(setting('home-description'));
+        JsonLdMulti::addValue('logo', setting('logo', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setImage(setting('logo', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setSite(setting('website-name'));
+        JsonLdMulti::setUrl(route('index'));
+        if (!JsonLdMulti::isEmpty()) {
+            JsonLdMulti::newJsonLd();
+            JsonLdMulti::setType('WebSite');
+            JsonLdMulti::setTitle($categories->pluck('name')->implode('/'));
+            JsonLdMulti::setDescription($category->meta_description);
+            JsonLdMulti::setImage($category->thumbnail);
+            JsonLdMulti::setSite($categories->pluck('name')->implode('/'));
+            JsonLdMulti::setUrl(url($categories->pluck('slug')->implode('/')));
+        }
+
+        return view('pages.news.index', $this->general($request));
+    }
+
+    public function category($slug, Request $request)
+    {
+        $slug = explode('/', $slug);
+        $cateSlug = array_pop($slug);
+        $category = Category::where('slug', $cateSlug)->where('status', 1)->firstorfail();
+        $this->data['category'] = $category;
+
+        $categories = Category::where('status', 1)->ancestorsAndSelf($category->id);
+        $this->data['categories'] = $categories;
+
+        $news_first = $category->news()->inRandomOrder()->get()->where('status', 1)->first();
+        $this->data['news_first'] = $news_first;
+
+        $news_right = $category->news()->get()->where('status', 1)->where('id', '!=', $news_first->id)->take(5);
+        $this->data['news_right'] = $news_right;
+
+        $news_slider = $category->news()->get()
+            ->where('status', 1)
+            ->where('id', '!=', $news_first->id)
+            ->whereNotIn('id', $news_right->pluck('id')->toArray())
+            ->take(4);
+
+        $this->data['news_slider'] = $news_slider;
+
+        $news_left = $category->news()->get()
+            ->where('status', 1)
+            ->where('id', '!=', $news_first->id)
+            ->whereNotIn('id', $news_right->pluck('id')->toArray())
+            ->whereNotIn('id', $news_slider->pluck('id')->toArray())
+            ->take(6);
+
+        $this->data['news_left'] = $news_left;
+
+
+        // Seo
+        SEOMeta::setTitle($category->meta_title);
+        SEOMeta::setKeywords($category->meta_keyword);
+        SEOMeta::addMeta('news_keywords', $value = $category->meta_keyword, $name = 'name');
+        SEOMeta::setDescription($category->meta_description);
+        SEOMeta::setCanonical($request->url());
+        SEOMeta::addMeta('author', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('copyright', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('generator', $value = setting('website-name'), $name = 'name');
+        SEOMeta::setRobots('noarchive,index,follow');
+
+        OpenGraph::setTitle($category->meta_title)
+            ->setDescription($category->meta_description)
+            ->setUrl($request->url())
+            ->setType('article')
+            ->addImage($category->thumbnail, ['height' => 800, 'width' => 354])
+            ->setSiteName(setting('website-name'))
+            ->addProperty('locale', 'vi_VN')
+            ->setArticle([
+                'author' => setting('social-facebook'),
+                'publisher' => setting('social-facebook'),
+                'tag' => $category->meta_keyword,
+                'section' => $category->name,
+                'published_time' => $category->created_at,
+                'modified_time' => $category->updated_at
+            ]);
+        SEOMeta::addMeta('fb:app_id', $value = setting('facebook-app-id'), $name = 'name');
+
+        TwitterCard::setType('summary')
+            ->setSite($category->meta_title)
+            ->setTitle($category->meta_title)
+            ->setDescription($category->meta_description)
+            ->setImage($category->thumbnail)
+            ->addValue('creator', setting('website-name'))
+            ->setUrl($request->url());
+
+        JsonLdMulti::setType('Organization');
+        JsonLdMulti::setTitle(setting('website-name'));
+        JsonLdMulti::setDescription(setting('home-description'));
+        JsonLdMulti::addValue('logo', setting('logo', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setImage(setting('logo', upload_url('70x70no-thumbnail.png')));
+        JsonLdMulti::setSite(setting('website-name'));
+        JsonLdMulti::setUrl(route('index'));
+        if (!JsonLdMulti::isEmpty()) {
+            JsonLdMulti::newJsonLd();
+            JsonLdMulti::setType('WebSite');
+            JsonLdMulti::setTitle($categories->pluck('name')->implode('/'));
+            JsonLdMulti::setDescription($category->meta_description);
+            JsonLdMulti::setImage($category->thumbnail);
+            JsonLdMulti::setSite($categories->pluck('name')->implode('/'));
+            JsonLdMulti::setUrl(url($categories->pluck('slug')->implode('/')));
+        }
+
+        return view('pages.category.index', $this->general($request));
+    }
+
+    public function search(Request $request)
+    {
+        $search = $request->query('q');
+        $news = [];
+        if ($search) {
+            $news = News::where('title', 'LIKE', "%{$search}%")->where('status', 1)->paginate(5);
+        }
+        $this->data['news'] = $news;
+
+        // Seo
+        SEOMeta::setTitle('Tìm kiếm tin tức: ' . $search . ' | ' . setting('search-title'));
+        SEOMeta::setKeywords(setting('search-keyword'));
+        SEOMeta::addMeta('news_keywords', $value = setting('search-keyword'), $name = 'name');
+        SEOMeta::setDescription(setting('home-description'));
+        SEOMeta::setCanonical($request->url());
+        SEOMeta::addMeta('author', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('copyright', $value = setting('website-name'), $name = 'name');
+        SEOMeta::addMeta('generator', $value = setting('website-name'), $name = 'name');
+        SEOMeta::setRobots('noarchive,index,follow');
+
+        OpenGraph::setTitle(setting('search-title'))
+            ->setDescription(setting('search-description'))
+            ->setUrl($request->url())
+            ->setType('article')
+            ->addImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')), ['height' => 800, 'width' => 354])
+            ->setSiteName(setting('website-name'))
+            ->addProperty('locale', 'vi_VN')
+            ->setArticle([
+                'author' => setting('social-facebook'),
+                'publisher' => setting('social-facebook'),
+                'tag' => setting('search-keyword'),
+                'section' => setting('website-name')
+            ]);
+        SEOMeta::addMeta('fb:app_id', $value = setting('facebook-app-id'), $name = 'name');
+
+        TwitterCard::setType('summary')
+            ->setSite(setting('search-title'))
+            ->setTitle(setting('search-title'))
+            ->setDescription(setting('search-description'))
+            ->setImage(setting('default-thumbnail', upload_url('70x70no-thumbnail.png')), ['height' => 800, 'width' => 354])
+            ->addValue('creator', setting('website-name'))
+            ->setUrl($request->url());
+
+        return view('pages.search', $this->general($request));
     }
 }

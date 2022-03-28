@@ -3,131 +3,242 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Redirect;
-use RealRashid\SweetAlert\Facades\Alert;
-use Illuminate\Support\Facades\Validator;
-use Auth;
-use App\Video;
+use App\Models\Video;
+use Illuminate\Support\Facades\Storage;
+use Validator;
+
 class VideoController extends Controller
 {
-    public function Authentication() {
-        $id = Auth::id();
-        if($id) {
-            return Redirect::to('dashboard');
-        } else {
-            return Redirect::to('admin-login')->send();
+    protected $paginate = 5;
+
+    public function authCheck()
+    {
+        if (!auth()->check()) {
+            abort(404);
+        } else if (auth()->user()->isDisable()) {
+            abort(403, 'This action is unauthorized.');
         }
     }
 
-    public function add_video() {
-        $this->Authentication();
-        return view('admin.video.add');
+    public function index()
+    {
+        $this->authCheck();
+        $filter = Video::getRequestFilter();
+        $this->data['filter'] = $filter;
+        $this->data['video'] = Video::applyFilter($filter)->with('author')->latest()->paginate($this->paginate);
+        return view('admin.video.list', $this->data);
     }
 
-    public function save_video(Request $request) {
-        $this->Authentication();
-        date_default_timezone_set('asia/ho_chi_minh');
-        $data = array();
-        $data['name'] = $request->name;
-        $data['code'] = $request->code;
-        $data['status'] = $request->status;
-        $data['status_delete'] = 1;
-        $admin_name = Auth::user()->admin_name;
-        $data['created_by'] = $admin_name;
-        $data['created_at'] = date('Y-m-d H:i:s');
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|min:3|max:255',
-            'code' => 'required|min:11|max:11'
-        ],
-        [
-            'name.required' => 'Tên Video không để trống !',
-            'name.min' => 'Tên Video tối thiểu 3 kí tự !',
-            'name.max' => 'Tên Video tối đa 255 kí tự !',
-            'code.required' => 'Code không để trống !',
-            'code.min' => 'Tên code tối thiểu 11 kí tự !',
-            'code.max' => 'Tên code tối đa 11 kí tự !'
-        ]
+    public function create()
+    {
+        $this->authCheck();
+        $this->data['video'] = new Video();
+        return view('admin.video.save', $this->data);
+    }
+
+    public function store(Request $request)
+    {
+        $this->authCheck();
+        $this->validate(
+            $request,
+            [
+                'video.title'            =>    'required|max:255',
+                'video.url'            =>    'nullable|url|regex:/http(?:s):\/\/(?:www\.)youtube\.com\/.+/i|max:255',
+                'video.category_video_id'        =>    'required|exists:category_videos,id',
+            ]
         );
-        if ($validator->fails()) {
-            toast($validator->messages()->all()[0], 'error');
-            return redirect()->back()->withInput();
-        } else {
-            $video = new Video();
-            $video->name = $data['name'];
-            $video->code = $data['code'];
-            $video->status = $data['status'];
-            $video->status_delete = $data['status_delete'];
-            $video->created_by = $data['created_by'];
-            $video->created_at = $data['created_at'];
-            $video->save();
-            toast('Thêm Video thành công', 'success');
-            return Redirect::to('/add-video');
+
+        $video = new Video();
+        $video->fill($request->input('video'));
+        $video->author_id = auth()->user()->id;
+
+        if ($request->hasFile('video.thumbnail')) {
+            $this->validate(
+                $request,
+                [
+                    'video.thumbnail' => [
+                        'bail',
+                        'image',
+                        'file_extension:jpeg,png,jpg',
+                        'mimes:jpeg,png,jpg',
+                        'mimetypes:image/jpeg,image/png,image/jpg'
+                    ]
+                ],
+                [
+                    'video.thumbnail.file_extension' => 'File ảnh không hợp lệ'
+                ]
+            );
+            $file = $request->file('video.thumbnail');
+            $filename = uniqid() . '-' . now()->timestamp . '.' . $file->getClientOriginalExtension();
+            $path = $request->file('video.thumbnail')->storeAs('thumbnail/video', $filename, 'public');
+            // Storage::disk('public')->setVisibility($path, 'public');
+            $thumbnail = Storage::disk('public')->url($path);
+            $video->filename = basename($path);
+            $video->thumbnail = $thumbnail;
         }
+
+        $video->save();
+        $video->categories()->sync((array) $request->input('video.category_video_id'));
+
+        if ($request->ajax()) {
+            return response()->json([
+                'title'        =>    'Thành công',
+                'message'    =>    'Đã thêm video mới',
+                'redirect'    =>    $request->exists('save_only') ?
+                    route('admin.video.edit', ['video' => $video->id]) :
+                    route('admin.video.create'),
+            ], 200);
+        }
+
+        if ($request->exists('save_only')) {
+            return redirect()->route('admin.video.edit', ['video' => $video->id]);
+        }
+
+        return redirect()->route('admin.video.create');
     }
 
-    public function list_video() {
-        $this->Authentication();
-        $video = Video::select('id', 'name', 'code', 'status', 'created_at', 'updated_at', 'created_by', 'modified_by')
-        ->where('status_delete', 1)->get();
-        return view('admin.video.list')->with('video', $video);
+    public function edit(Video $video)
+    {
+        $this->authCheck();
+        $this->data['video'] = $video;
+        $this->data['video_id'] = $video->id;
+        return view('admin.video.save', $this->data);
     }
 
-    public function edit_video($id) {
-        $this->Authentication();
-        $video = Video::where('id', $id)->get();
-        return view('admin.video.edit')->with('video', $video);
-    }
-
-    public function update_video(Request $request, $id) {
-        $this->Authentication();
-        date_default_timezone_set('asia/ho_chi_minh');
-        $data = array();
-        $data['name'] = $request->name;
-        $data['code'] = $request->code;
-        $admin_name = Auth::user()->admin_name;
-        $data['modified_by'] = $admin_name;
-        $data['updated_at'] = date('Y-m-d H:i:s');
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|min:3|max:255',
-            'code' => 'required|min:11|max:11'
-        ],
-        [
-            'name.required' => 'Tên Video không để trống !',
-            'name.min' => 'Tên Video tối thiểu 3 kí tự !',
-            'name.max' => 'Tên Video tối đa 255 kí tự !',
-            'code.required' => 'Code không để trống !',
-            'code.min' => 'Tên code tối thiểu 11 kí tự !',
-            'code.max' => 'Tên code tối đa 11 kí tự !'
-        ]
+    public function update(Request $request, Video $video)
+    {
+        $this->authCheck();
+        $this->validate(
+            $request,
+            [
+                'video.title'            =>    'required|max:255',
+                'video.url'            =>    'nullable|url|regex:/http(?:s):\/\/(?:www\.)youtube\.com\/.+/i|max:255',
+                'video.category_video_id'    =>    'required|exists:category_videos,id'
+            ]
         );
-        if ($validator->fails()) {
-            toast($validator->messages()->all()[0], 'error');
-            return redirect()->back()->withInput();
-        } else {
-            Video::where('id', $id)->update($data);
-            toast('Chỉnh sửa Video thành công', 'success');
-            return Redirect::to('/list-video');
+
+        $data = [
+            'title' => $request->input('video.title'),
+            'slug' => $request->input('video.slug'),
+            'url' => $request->input('video.url'),
+            'author_id' => auth()->user()->id,
+            'meta_title' => $request->input('video.meta_title'),
+            'meta_description' => $request->input('video.meta_description'),
+            'meta_keyword' => $request->input('video.meta_keyword'),
+            'meta_title' => $request->input('video.meta_title')
+        ];
+
+        if ($request->hasFile('video.thumbnail')) {
+            $this->validate(
+                $request,
+                [
+                    'video.thumbnail' => [
+                        'bail',
+                        'image',
+                        'file_extension:jpeg,png,jpg',
+                        'mimes:jpeg,png,jpg',
+                        'mimetypes:image/jpeg,image/png,image/jpg'
+                    ]
+                ],
+                [
+                    'video.thumbnail.file_extension' => 'File ảnh không hợp lệ'
+                ]
+            );
+            Storage::disk('public')->delete('thumbnail/video/' . $video->filename);
+            $file = $request->file('video.thumbnail');
+            $filename = uniqid() . '-' . now()->timestamp . '.' . $file->getClientOriginalExtension();
+            $path = $request->file('video.thumbnail')->storeAs('thumbnail/video', $filename, 'public');
+            // Storage::disk('public')->setVisibility($path, 'public');
+            $thumbnail = Storage::disk('public')->url($path);
+            $data['filename'] = basename($path);
+            $data['thumbnail'] = $thumbnail;
         }
-    }
 
-    public function delete_video($id){
-        $admin_name = Auth::user()->admin_name;
-        Video::where('id', $id)->update(['status_delete' => 0, 'deleted_by' => $admin_name]);
-        toast('Xóa Video thành công', 'success');
-        return Redirect::to('/list-video');
-    }
+        $video->update($data);
+        $video->categories()->sync((array) $request->input('video.category_video_id'));
 
-    public function active_video($id) {
-        $this->Authentication();
-        Video::where('id', $id)->update(['status' => 0]);
-        toast('Đã ẩn Video', 'success');
+        if ($request->ajax()) {
+            $response = [
+                'title'        =>    'Thành công',
+                'message'    =>    'Đã cập nhật video',
+            ];
+            if ($request->exists('save_and_out')) {
+                $response['redirect'] = route('admin.video.index');
+            }
+
+            if ($request->exists('save_only')) {
+                $response['redirect'] = route('admin.video.edit', ['video' => $video->id]);
+            }
+
+            return response()->json($response, 200);
+        }
+
+        if ($request->exists('save_and_out')) {
+            return redirect()->route('admin.video.index');
+        }
+
         return redirect()->back();
     }
 
-    public function unactive_video($id) {
-        $this->Authentication();
-        Video::where('id', $id)->update(['status' => 1]);
-        toast('Đã hiện Video', 'success');
+    public function disable(Request $request, Video $video)
+    {
+        $this->authCheck();
+        $video->markAsDisable();
+        if ($request->ajax()) {
+            return response()->json([
+                'title'            =>    trans('cms.success'),
+                'message'        =>    trans('video.disable-video-success'),
+                'redirect'    =>    route('admin.video.index')
+            ], 200);
+        }
+
         return redirect()->back();
+    }
+
+    public function enable(Request $request, Video $video)
+    {
+        $this->authCheck();
+        $video->markAsEnable();
+        if ($request->ajax()) {
+            return response()->json([
+                'title'            =>    trans('cms.success'),
+                'message'        =>    trans('video.enable-video-success'),
+                'redirect'    =>    route('admin.video.index')
+            ], 200);
+        }
+        return redirect()->back();
+    }
+
+    public function destroy(Request $request, Video $video)
+    {
+        $this->authCheck();
+        Storage::disk('public')->delete('thumbnail/video/' . $video->filename);
+        $video->delete();
+        if ($request->ajax()) {
+            return response()->json([
+                'title'            =>    trans('cms.success'),
+                'message'        =>    trans('video.destroy-video-success'),
+                'redirect'    =>    route('admin.video.index')
+            ], 200);
+        }
+        return redirect()->back();
+    }
+
+    public function upload(Request $request)
+    {
+        $this->authCheck();
+        // if ($request->hasFile('video.thumbnail')) {
+        //     // $file = $request->file('video.thumbnail');
+        //     // $filename = $file->getClientOriginalName();
+        //     // $folder = uniqid() . '-' . now()->timestamp;
+        //     // $file->storeAs('post/' . $folder, $filename);
+        //     // return $folder;
+        //     $filepond = app(\Sopamo\LaravelFilepond\Filepond::class);
+        //     $path = $filepond->getPathFromServerId($request->file('video.thumbnail'));
+        //     $finalLocation = public_path('/post');
+        //     \File::move($path, $finalLocation);
+        //     return $path;
+        // }
+        // return '';
     }
 }

@@ -1,5 +1,20 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MenuController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\NewsController;
+use App\Http\Controllers\SettingController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\MailController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\CategoryVideoController;
+use App\Http\Controllers\VideoController;
+use App\Http\Controllers\StatisticController;
+use App\Http\Controllers\FileController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -11,137 +26,160 @@
 |
 */
 
-Route::get('/', 'HomeController@index');
-
-// 404
-Route::get('/404', 'HomeController@errors_404');
-
-// Admin
-Route::get('/admin-login', 'AdminController@index');
-Route::post('/admin-login', 'AdminController@login');
-Route::get('/logout', 'AdminController@logout');
-Route::get('/dashboard', 'AdminController@dashboard')->middleware('twofactor');
-
-// Search
-Route::get('/search', 'SearchController@search')->name('web.search');
-
-Route::group([ 'middleware' => 'roles.user'], function () {
-    //Category
-    Route::get('/add-category-users', 'CategoryNew@add_category_users');
-    Route::get('/list-category-users', 'CategoryNew@list_category_users');
-    Route::get('/edit-category-users/{id}', 'CategoryNew@edit_category_users');
-    Route::post('/update-category-users/{id}', 'CategoryNew@update_category_users');
-    Route::post('/save-category-users', 'CategoryNew@save_category_users');
-    Route::get('/delete-category-users/{id}', 'CategoryNew@delete_category_users');
-
-    // Type New
-    Route::get('/list-type-users', 'TypeController@list_type_users');
-    Route::get('/add-type-users', 'TypeController@add_type_users');
-    Route::post('/save-type-users', 'TypeController@save_type_users');
-    Route::get('/edit-type-users/{id}', 'TypeController@edit_type_users');
-    Route::post('/update-type-users/{id}', 'TypeController@update_type_users');
-    Route::get('/delete-type-users/{id}', 'TypeController@delete_type_users');
-
-    // New
-    Route::get('/list-new-users', 'NewController@list_new_users');
-    Route::get('/add-new-users', 'NewController@add_new_users');
-    Route::post('/save-new-users', 'NewController@save_new_users');
-    Route::get('/edit-new-users/{id}', 'NewController@edit_new_users');
-    Route::post('/update-new-users/{id}', 'NewController@update_new_users');
-    Route::get('/delete-new-users/{id}', 'NewController@delete_new_users');
-
-    Route::get('/active-new-users/{id}', 'NewController@active_new_users');
-    Route::get('/unactive-new-users/{id}', 'NewController@unactive_new_users');
-    
+Route::prefix('login')->group(function () {
+    Route::get('/', [LoginController::class, 'index'])->name('login.index');
+    Route::post('/', [LoginController::class, 'signin'])->name('login.signin');
 });
 
-Route::group([ 'middleware' => 'roles'], function () {
-    // Category New
-    Route::get('/list-category', 'CategoryNew@list_category');
-    Route::get('/add-category', 'CategoryNew@add_category');
-    Route::post('/save-category', 'CategoryNew@save_category');
-    Route::get('/edit-category/{id}', 'CategoryNew@edit_category');
-    Route::post('/update-category/{id}', 'CategoryNew@update_category');
-    Route::get('/delete-category/{id}', 'CategoryNew@delete_category');
-    Route::get('/active-category/{id}', 'CategoryNew@active_category');
-    Route::get('/unactive-category/{id}', 'CategoryNew@unactive_category');
+Route::get('/logout', [LoginController::class, 'logout'])->name('logout');
 
-    // Type New
-    Route::get('/list-type', 'TypeController@list_type');
-    Route::get('/add-type', 'TypeController@add_type');
-    Route::post('/save-type', 'TypeController@save_type');
-    Route::get('/edit-type/{id}', 'TypeController@edit_type');
-    Route::post('/update-type/{id}', 'TypeController@update_type');
-    Route::get('/delete-type/{id}', 'TypeController@delete_type');
-    Route::get('/active-type/{id}', 'TypeController@active_type');
-    Route::get('/unactive-type/{id}', 'TypeController@unactive_type');
-
-    // New
-    Route::get('/list-new', 'NewController@list_new');
-    Route::get('/add-new', 'NewController@add_new');
-    Route::post('/save-new', 'NewController@save_new');
-    Route::get('/edit-new/{id}', 'NewController@edit_new');
-    Route::post('/update-new/{id}', 'NewController@update_new');
-    Route::get('/delete-new/{id}', 'NewController@delete_new');
-    Route::get('/active-new/{id}', 'NewController@active_new');
-    Route::get('/unactive-new/{id}', 'NewController@unactive_new');
-
-
-    // Users
-    Route::get('/add-users','UserController@add_users');
-    Route::get('/list-users','UserController@list_users');
-    //save users
-    Route::post('/store-users','UserController@store_users');
-    //phân quyền users
-    Route::post('/assign-roles','UserController@assign_roles');
-    // xóa user
-    Route::get('/delete-user-roles/{admin_id}','UserController@delete_user_roles');
-
-    //list accept article
-    Route::get('/list-new-accept','NewController@list_new_accept');
-    Route::get('/refuse-new/{id}','NewController@refuse_new');
-    Route::get('/accept-new/{id}','NewController@accept_new');
-    Route::get('/unactive-status-accept-new/{id}','NewController@unactive_status_accept_new');
-    Route::get('/active-status-accept-new/{id}','NewController@active_status_accept_new');
-    //Menu
-    Route::get('/list-position-menu','CategoryNew@list_position_menu');
-    Route::post('/update-list-position','CategoryNew@update_list_position');
-    
-    //Menu sub
-    Route::get('/edit-menu-sub/{id}','TypeController@edit_menu_sub');
-    Route::post('/update-menu-sub','TypeController@update_menu_sub');
-    
-    //Video
-    Route::get('/add-video','VideoController@add_video');
-    Route::post('/save-video','VideoController@save_video');
-    Route::get('/list-video','VideoController@list_video');
-    Route::get('/edit-video/{id}','VideoController@edit_video');
-    Route::post('/update-video/{id}','VideoController@update_video');
-    Route::get('/delete-video/{id}','VideoController@delete_video');
-    Route::get('/active-video/{id}', 'VideoController@active_video');
-    Route::get('/unactive-video/{id}', 'VideoController@unactive_video');
-
-    //user
-    Route::get('/resend-verify-email/{id}','UserController@resend_verify_email');
+Route::prefix('email')->group(function () {
+    Route::get('/', [MailController::class, 'index'])->name('verification.index');
+    Route::post('resend', [MailController::class, 'resend'])->name('verification.resend');
+    Route::get('verify/{id}', [MailController::class, 'verify'])->name('verification.verify');
 });
 
-// chuyển quyền
-Route::get('/impersonate/{admin_id}','UserController@impersonate');
-Route::get('/impersonate-destroy','UserController@impersonate_destroy');
+Route::get('/error.html', [HomeController::class, 'error'])->name('error');
 
-Route::post('/uploads-ckeditor','NewController@ckeditor_image');
-Route::get('/file-browser','NewController@file_browser');
+Route::group(['middleware' => 'verified', 'prefix' => 'admin'], function () {
+    Route::get('/', [AdminController::class, 'index'])->name('admin.index')->middleware('can:admin.index');
 
-Route::group(['middleware' => 'filter'], function() {
-    Route::get('/{code}.html', 'HomeController@detail_article');
+    Route::prefix('file')->group(function () {
+        Route::get('/', [FileController::class, 'index'])->name('admin.file.image.index')->middleware('can:admin.file.image.index');
+        Route::get('/manager', [FileController::class, 'manager'])->name('admin.file.manager.index')->middleware('can:admin.file.image.index');
+    });
+
+    Route::prefix('setting')->group(function () {
+        Route::get('/', [SettingController::class, 'general'])->name('admin.setting.general')->middleware('can:admin.setting.general');
+        Route::put('/', [SettingController::class, 'generalUpdate'])->name('admin.setting.general.update')->middleware('can:admin.setting.general');
+    });
+
+    Route::prefix('menu')->group(function () {
+        Route::get('/', [MenuController::class, 'index'])->name('admin.menu.index')->middleware('can:admin.menu.index');
+
+        Route::get('/create', [MenuController::class, 'create'])->name('admin.menu.create')->middleware('can:admin.menu.create');
+        Route::post('/', [MenuController::class, 'store'])->name('admin.menu.store')->middleware('can:admin.menu.create');
+
+        Route::get('{menu}/edit', [MenuController::class, 'edit'])->name('admin.menu.edit')->middleware('can:admin.menu.edit');
+        Route::put('{menu}', [MenuController::class, 'update'])->name('admin.menu.update')->middleware('can:admin.menu.edit');
+
+        Route::put('{menu}/disable', [MenuController::class, 'disable'])->name('admin.menu.disable')->middleware('can:admin.menu.disable');
+        Route::put('{menu}/enable', [MenuController::class, 'enable'])->name('admin.menu.enable')->middleware('can:admin.menu.enable');
+
+        Route::get('{menu}/up', [MenuController::class, 'up'])->name('admin.menu.up')->middleware('can:admin.menu.sort');
+        Route::get('{menu}/down', [MenuController::class, 'down'])->name('admin.menu.down')->middleware('can:admin.menu.sort');
+
+        Route::delete('{menu}', [MenuController::class, 'destroy'])->name('admin.menu.destroy')->middleware('can:admin.menu.destroy');
+    });
+
+    Route::prefix('category')->group(function () {
+        Route::get('/', [CategoryController::class, 'index'])->name('admin.category.index')->middleware('can:admin.category.index');
+
+        Route::get('/create', [CategoryController::class, 'create'])->name('admin.category.create')->middleware('can:admin.category.create');
+        Route::post('/', [CategoryController::class, 'store'])->name('admin.category.store')->middleware('can:admin.category.create');
+
+        Route::get('{category}/edit', [CategoryController::class, 'edit'])->name('admin.category.edit')->middleware('can:admin.category.edit');
+        Route::put('{category}', [CategoryController::class, 'update'])->name('admin.category.update')->middleware('can:admin.category.edit');
+
+        Route::put('{category}/disable', [CategoryController::class, 'disable'])->name('admin.category.disable')->middleware('can:admin.category.disable');
+        Route::put('{category}/enable', [CategoryController::class, 'enable'])->name('admin.category.enable')->middleware('can:admin.category.enable');
+        Route::delete('{category}', [CategoryController::class, 'destroy'])->name('admin.category.destroy')->middleware('can:admin.category.destroy');
+
+        Route::get('{category}/up', [CategoryController::class, 'up'])->name('admin.category.up')->middleware('can:admin.category.sort');
+        Route::get('{category}/down', [CategoryController::class, 'down'])->name('admin.category.down')->middleware('can:admin.category.sort');
+    });
+
+    Route::prefix('news')->group(function () {
+        Route::get('/', [NewsController::class, 'index'])->name('admin.news.index')->middleware('can:admin.news.index');
+
+        Route::get('/create', [NewsController::class, 'create'])->name('admin.news.create')->middleware('can:admin.news.create');
+        Route::post('/', [NewsController::class, 'store'])->name('admin.news.store')->middleware('can:admin.news.create');
+
+        Route::get('{news}/edit', [NewsController::class, 'edit'])->name('admin.news.edit')->middleware('can:admin.news.edit');
+        Route::put('{news}', [NewsController::class, 'update'])->name('admin.news.update')->middleware('can:admin.news.edit');
+
+        Route::put('{news}/disable', [NewsController::class, 'disable'])->name('admin.news.disable')->middleware('can:admin.news.disable');
+        Route::put('{news}/enable', [NewsController::class, 'enable'])->name('admin.news.enable')->middleware('can:admin.news.enable');
+        Route::delete('{news}', [NewsController::class, 'destroy'])->name('admin.news.destroy')->middleware('can:admin.news.destroy');
+
+        Route::post('/upload', [NewsController::class, 'upload'])->name('admin.news.upload')->middleware('can:admin.news.upload');
+    });
+
+    Route::prefix('user')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->name('admin.user.index')->middleware('can:admin.user.manage');
+
+        Route::get('/create', [UserController::class, 'create'])->name('admin.user.create')->middleware('can:admin.user.manage');
+        Route::post('/', [UserController::class, 'store'])->name('admin.user.store')->middleware('can:admin.user.manage');
+
+        Route::get('{user}/edit', [UserController::class, 'edit'])->name('admin.user.edit')->middleware('can:admin.user.manage');
+        Route::put('{user}', [UserController::class, 'update'])->name('admin.user.update')->middleware('can:admin.user.manage');
+
+        Route::put('{user}/disable', [UserController::class, 'disable'])->name('admin.user.disable')->middleware('can:admin.user.manage');
+        Route::put('{user}/enable', [UserController::class, 'enable'])->name('admin.user.enable')->middleware('can:admin.user.manage');
+        Route::delete('{user}', [UserController::class, 'destroy'])->name('admin.user.destroy')->middleware('can:admin.user.manage');
+    });
+
+    Route::prefix('role')->group(function () {
+        Route::get('/', [RoleController::class, 'index'])->name('admin.role.index')->middleware('can:admin.role.manage');
+
+        Route::get('/create', [RoleController::class, 'create'])->name('admin.role.create')->middleware('can:admin.role.manage');
+        Route::post('/', [RoleController::class, 'store'])->name('admin.role.store')->middleware('can:admin.role.manage');
+
+        Route::get('{role}/edit', [RoleController::class, 'edit'])->name('admin.role.edit')->middleware('can:admin.role.manage');
+        Route::put('{role}', [RoleController::class, 'update'])->name('admin.role.update')->middleware('can:admin.role.manage');
+
+        Route::delete('{role}', [RoleController::class, 'destroy'])->name('admin.role.destroy')->middleware('can:admin.role.manage');
+    });
+
+    Route::prefix('category-video')->group(function () {
+        Route::get('/', [CategoryVideoController::class, 'index'])->name('admin.category.video.index')->middleware('can:admin.category.video.index');
+
+        Route::get('/create', [CategoryVideoController::class, 'create'])->name('admin.category.video.create')->middleware('can:admin.category.video.create');
+        Route::post('/', [CategoryVideoController::class, 'store'])->name('admin.category.video.store')->middleware('can:admin.category.video.create');
+
+        Route::get('{category}/edit', [CategoryVideoController::class, 'edit'])->name('admin.category.video.edit')->middleware('can:admin.category.video.edit');
+        Route::put('{category}', [CategoryVideoController::class, 'update'])->name('admin.category.video.update')->middleware('can:admin.category.video.edit');
+
+        Route::put('{category}/disable', [CategoryVideoController::class, 'disable'])->name('admin.category.video.disable')->middleware('can:admin.category.video.disable');
+        Route::put('{category}/enable', [CategoryVideoController::class, 'enable'])->name('admin.category.video.enable')->middleware('can:admin.category.video.enable');
+        Route::delete('{category}', [CategoryVideoController::class, 'destroy'])->name('admin.category.video.destroy')->middleware('can:admin.category.video.destroy');
+
+        Route::get('{category}/up', [CategoryVideoController::class, 'up'])->name('admin.category.video.up')->middleware('can:admin.category.video.sort');
+        Route::get('{category}/down', [CategoryVideoController::class, 'down'])->name('admin.category.video.down')->middleware('can:admin.category.video.sort');
+    });
+
+    Route::prefix('video')->group(function () {
+        Route::get('/', [VideoController::class, 'index'])->name('admin.video.index')->middleware('can:admin.video.index');
+
+        Route::get('/create', [VideoController::class, 'create'])->name('admin.video.create')->middleware('can:admin.video.create');
+        Route::post('/', [VideoController::class, 'store'])->name('admin.video.store')->middleware('can:admin.video.create');
+
+        Route::get('{video}/edit', [VideoController::class, 'edit'])->name('admin.video.edit')->middleware('can:admin.video.edit');
+        Route::put('{video}', [VideoController::class, 'update'])->name('admin.video.update')->middleware('can:admin.video.edit');
+
+        Route::put('{video}/disable', [VideoController::class, 'disable'])->name('admin.video.disable')->middleware('can:admin.video.disable');
+        Route::put('{video}/enable', [VideoController::class, 'enable'])->name('admin.video.enable')->middleware('can:admin.video.enable');
+        Route::delete('{video}', [VideoController::class, 'destroy'])->name('admin.video.destroy')->middleware('can:admin.video.destroy');
+
+        Route::post('/upload', [VideoController::class, 'upload'])->name('admin.video.upload')->middleware('can:admin.video.upload');
+    });
+    Route::prefix('statistic')->group(function () {
+        Route::post('/visitors-views', [StatisticController::class, 'visitorsViews'])->name('admin.statistic.visitors.views');
+        Route::post('/most-visited-pages', [StatisticController::class, 'mostVisitedPages'])->name('admin.statistic.most.visited.pages');
+    });
 });
 
-Route::get('verify/resend', 'TwoFactorController@resend')->name('verify.resend');
-Route::resource('verify', 'TwoFactorController')->only(['index', 'store']);
+
+Route::get('/tim-kiem', [HomeController::class, 'search'])->name('search');
 
 
-Route::get('/verify-email/{verification_code}','UserController@verify_email')->name('verify_email');
+Route::prefix('/')->group(function () {
+    Route::get('', [HomeController::class, 'index'])->name('index');
+    Route::get('{slug}-{id}.html', [HomeController::class, 'news'])
+        ->where('slug', '[a-zA-Z0-9-_]+')
+        ->where('id', '[0-9]+')->name('news');
 
-Route::get('/{code}', 'HomeController@detail_category');
-
-Route::get('/{code_category}/{code_type}', 'HomeController@detail_type');
+    Route::get('{slug}', [HomeController::class, 'category'])
+        ->where('slug', '(.*)?')
+        ->name('category');
+});

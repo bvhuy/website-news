@@ -1,30 +1,39 @@
 <?php
 
-/** @var \Illuminate\Database\Eloquent\Factory $factory */
-use App\Admin;
-use App\Roles;
+namespace Database\Factories;
+
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
-use Faker\Generator as Faker;
 
-/*
-|--------------------------------------------------------------------------
-| Model Factories
-|--------------------------------------------------------------------------
-|
-| This directory should contain each of the model factory definitions for
-| your application. Factories provide a convenient way to generate new
-| model instances for testing / seeding your application's database.
-|
-*/
+class UserFactory extends Factory
+{
+    /**
+     * Define the model's default state.
+     *
+     * @return array
+     */
+    public function definition()
+    {
+        return [
+            'name' => $this->faker->name(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'email_verified_at' => now(),
+            'password' => '$2y$10$dYpJhf3jC0Dl4RWTsiNzTuRrdKhtOYQ6lFumEIrZ2GMCxNGmaU91a', // password
+            'remember_token' => Str::random(10),
+        ];
+    }
 
-$factory->define(Admin::class, function (Faker $faker) {
-    return [
-        'admin_name' => $faker->name,
-        'admin_email' => $faker->unique()->safeEmail,
-        'admin_password' => 'e10adc3949ba59abbe56e057f20f883e', // password
-    ];
-});
-$factory->afterCreating(Admin::class, function($admin,$faker){
-	$roles = Roles::where('name','user')->get();
-	$admin->roles()->sync($roles->pluck('id_roles')->toArray());
-});
+    /**
+     * Indicate that the model's email address should be unverified.
+     *
+     * @return \Illuminate\Database\Eloquent\Factories\Factory
+     */
+    public function unverified()
+    {
+        return $this->state(function (array $attributes) {
+            return [
+                'email_verified_at' => null,
+            ];
+        });
+    }
+}
