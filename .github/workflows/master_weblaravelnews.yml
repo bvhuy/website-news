@@ -56,5 +56,5 @@ jobs:
         with:
           app-name: 'WebLaravelNews'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B49B0A8EDD7E4EB297CDD610DF0DD558 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_FECA5806E34843D5A4FB5A630458EC76 }}
           package: .
